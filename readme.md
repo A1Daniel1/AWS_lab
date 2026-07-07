@@ -95,11 +95,22 @@ Ingresar desde el **DNS del Load Balancer**. Refrescar la página para observar 
 ## Preguntas — Parte 1
 
 1. ¿Qué instancia respondió primero?
+   **R:** Depende de cuál reciba la primera solicitud; el ALB selecciona una instancia según su algoritmo de balanceo (round-robin).
+
 2. ¿El balanceador alternó entre ambas instancias?
+   **R:** Sí, al refrescar la página se observa que el ALB distribuye las solicitudes entre ambas.
+
 3. ¿Qué información permite confirmar que hay más de una instancia activa?
+   **R:** El `Instance ID` y la `Availability Zone` que muestra cada página, ya que son distintos entre una instancia y otra.
+
 4. ¿Qué papel cumple el Target Group?
+   **R:** Agrupa las instancias EC2, define el puerto de escucha y las reglas de health check. El ALB enruta el tráfico hacia las instancias registradas en el Target Group.
+
 5. ¿Qué papel cumplen los health checks?
+   **R:** Monitorean periódicamente la salud de cada instancia consultando el endpoint `/health`. Si una instancia falla, el ALB deja de enviarle tráfico hasta que se recupere.
+
 6. ¿Por qué el usuario no necesita conocer las IP públicas de las instancias?
+   **R:** Porque el ALB expone un único DNS público como punto de entrada único, ocultando la topología interna.
 
 ---
 
@@ -116,10 +127,19 @@ A pesar de la falla, el sistema sigue respondiendo desde la **instancia B** a tr
 ### Preguntas — Parte 2
 
 1. ¿Qué ocurrió cuando se detuvo la instancia A?
+   **R:** El health check detectó que la instancia A dejó de responder (estado `Unhealthy`). El ALB dejó de enviarle tráfico y redirigió todas las solicitudes a la instancia B.
+
 2. ¿El sistema completo dejó de estar disponible?
+   **R:** No, la instancia B continuó respondiendo, por lo que el sistema siguió disponible.
+
 3. ¿Qué hizo el Load Balancer cuando detectó la falla?
+   **R:** Marcó la instancia como `Unhealthy` en el Target Group y desvió todo el tráfico a las instancias restantes (instancia B).
+
 4. ¿Qué diferencia habría si solo existiera una instancia?
+   **R:** El sistema habría dejado de estar disponible por completo (punto único de falla o SPOF).
+
 5. ¿Qué atributo de calidad mejora esta arquitectura?
+   **R:** La **alta disponibilidad** (availability) y la **tolerancia a fallos** (fault tolerance).
 
 ---
 
@@ -132,9 +152,16 @@ Se volvió a levantar la **instancia A**. Ambas instancias quedan operativas nue
 ### Preguntas — Parte 3
 
 1. ¿Qué ocurrió cuando la instancia A volvió a estar saludable?
+   **R:** El health check la detectó como `Healthy` nuevamente y el ALB reanudó el envío de tráfico hacia ella.
+
 2. ¿El balanceador volvió a enviarle tráfico?
+   **R:** Sí, el ALB la reincorporó automáticamente al pool de instancias activas y distribuyó tráfico entre A y B nuevamente.
+
 3. ¿Por qué es importante que la recuperación sea automática desde el punto de vista del usuario?
+   **R:** Porque evita intervención manual, minimiza el tiempo de indisponibilidad y el usuario final no percibe interrupciones.
+
 4. ¿Qué limitaciones tiene esta arquitectura si la instancia no se reinicia manualmente?
+   **R:** Depende de un operador para restaurar el servicio, lo que introduce latencia humana, posible error manual, y el sistema opera con capacidad reducida hasta que alguien intervenga. En producción se resuelve con Auto Scaling.
 
 ### Tabla de componentes
 
@@ -159,32 +186,25 @@ Se volvió a levantar la **instancia A**. Ambas instancias quedan operativas nue
 
 ## Propuesta de mejora para producción
 
-A partir de la arquitectura implementada, una versión mejorada para producción debería incluir:
+A partir de la arquitectura construida, proponga una versión mejorada para producción.
 
-### Recuperación automática
-- Usar **Auto Scaling Group** con un mínimo de 2 instancias para reemplazar instancias fallidas automáticamente.
-- Configurar **Recovery de CloudWatch Alarm** para reiniciar instancias ante fallos de sistema.
+1. **¿Cómo agregaría recuperación automática?**
+   **R:** Implementando un **Auto Scaling Group** con un mínimo de 2 instancias y alarms de CloudWatch para lanzar/reemplazar instancias automáticamente. También se puede configurar **Recovery de CloudWatch Alarm** para reiniciar instancias ante fallos de sistema.
 
-### Seguridad
-- Colocar las EC2 en **subredes privadas** y usar un **NAT Gateway** para salida a internet.
-- Solo el ALB debe estar en una **subred pública**.
+2. **¿Cómo protegería las instancias para que no sean públicas?**
+   **R:** Colocando las EC2 en **subredes privadas** y usando un **NAT Gateway** para salida a internet. Solo el ALB estaría en una **subred pública**.
 
-### HTTPS
-- Asociar un **certificado SSL/TLS** desde **AWS Certificate Manager (ACM)** al ALB.
-- Redirigir el tráfico HTTP (puerto 80) a HTTPS (puerto 443) a nivel del ALB.
+3. **¿Cómo agregaría HTTPS?**
+   **R:** Asociando un **certificado SSL/TLS de AWS Certificate Manager (ACM)** al ALB y redirigiendo el tráfico HTTP (puerto 80) a HTTPS (puerto 443) a nivel del balanceador.
 
-### Observabilidad
-- Habilitar **Access Logs** del ALB en S3.
-- Configurar **CloudWatch Metrics** y **CloudWatch Alarms** para CPU, estado de health checks, etc.
-- Usar **AWS X-Ray** para trazar solicitudes entre el ALB y las instancias.
+4. **¿Cómo registraría logs y métricas?**
+   **R:** Habilitando **Access Logs del ALB** en S3, configurando **CloudWatch Metrics y Alarms** para monitorear CPU y estado de health checks, y usando **AWS X-Ray** para trazado de solicitudes.
 
-### Despliegues sin caída
-- Implementar **rolling updates** o **blue/green deployments** con **CodeDeploy**.
-- Usar **Auto Scaling** con **lifecycle hooks** para drenar conexiones antes de terminar instancias.
+5. **¿Cómo manejaría despliegues sin caída?**
+   **R:** Con **rolling updates** o **blue/green deployments** usando **CodeDeploy** y lifecycle hooks en el Auto Scaling Group para drenar conexiones antes de terminar instancias.
 
-### Base de datos altamente disponible
-- Reemplazar una base de datos local por **Amazon RDS Multi-AZ** (sincrónico entre AZs).
-- Para cargas de trabajo NoSQL, usar **Amazon DynamoDB** con tablas globales.
+6. **¿Qué componentes agregaría para una base de datos altamente disponible?**
+   **R:** **Amazon RDS Multi-AZ** (réplica síncrona en otra AZ) para bases relacionales, o **Amazon DynamoDB** con tablas globales para bases NoSQL.
 
 ---
 
