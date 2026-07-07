@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# Actualizar el sistema e instalar Apache
+dnf update -y
+dnf install -y httpd
+
+# Habilitar e iniciar el servicio web
+systemctl enable httpd
+systemctl start httpd
+
+# Obtener metadatos de la instancia de AWS (IMDSv2)
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+AZ=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/availability-zone)
+
+# Generar la página web principal
+cat <<EOF > /var/www/html/index.html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alta Disponibilidad - Instancia B</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f7fb;
+            color: #1f2937;
+            padding: 40px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 700px;
+            margin: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        }
+        h1 {
+            color: #059669;
+        }
+        .badge {
+            display: inline-block;
+            background: #d1fae5;
+            color: #047857;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        code {
+            background: #f3f4f6;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <span class="badge">Instancia B</span>
+        <h1>Aplicación Web en Alta Disponibilidad</h1>
+        <p>Esta respuesta fue generada por la instancia B.</p>
+        <p><strong>Instance ID:</strong> <code>$INSTANCE_ID</code></p>
+        <p><strong>Availability Zone:</strong> <code>$AZ</code></p>
+        <p><strong>Estado:</strong> Servicio disponible</p>
+    </div>
+</body>
+</html>
+EOF
+
+# Crear el endpoint de verificación de estado (Health Check)
+echo "OK" > /var/www/html/health
