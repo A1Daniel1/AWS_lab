@@ -207,18 +207,3 @@ A partir de la arquitectura construida, proponga una versión mejorada para prod
    **R:** **Amazon RDS Multi-AZ** (réplica síncrona en otra AZ) para bases relacionales, o **Amazon DynamoDB** con tablas globales para bases NoSQL.
 
 ---
-
-## Entregables del laboratorio
-
-El estudiante debe entregar un documento breve con:
-
-1. Diagrama de arquitectura implementada.
-2. Captura de las dos instancias EC2.
-3. Captura del Target Group con targets Healthy.
-4. Captura del Application Load Balancer.
-5. Evidencia de respuesta desde instancia A.
-6. Evidencia de respuesta desde instancia B.
-7. Evidencia de falla simulada.
-8. Explicación de cómo el balanceador mantiene la disponibilidad.
-9. Limitaciones de la arquitectura.
-10. Propuesta de mejora hacia producción.
